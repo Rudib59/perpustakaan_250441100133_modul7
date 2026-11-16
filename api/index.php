@@ -1,5 +1,6 @@
 <?php
-
+$_SERVER['HTTPS'] = 'on';
+$_SERVER['SERVER_PORT'] = 443;
 // Siapkan folder yang bisa ditulis di Vercel
 $tmpDirs = [
     '/tmp/storage/framework/views',
