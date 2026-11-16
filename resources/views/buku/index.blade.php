@@ -121,10 +121,14 @@
     data-csrf="{{ csrf_token() }}">
     <h1>Daftar Buku</h1>
 
-    <div id="pesan"></div>
     @if (session('error'))
     <div style="background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:6px;margin-bottom:12px;">
         {{ session('error') }}
+    </div>
+    @endif
+    @if ($errors->any())
+    <div style="background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:6px;margin-bottom:12px;">
+        {{ $errors->all()[0] }}
     </div>
     @endif
     @if (session('sukses'))
@@ -134,27 +138,30 @@
     @endif
 
     @can('kelola-buku')
-    <form id="form-buku" class="buku-form">
+    <form id="form-buku" class="buku-form" method="POST"
+        action="{{ route('buku.store') }}" data-url-dasar="{{ url('/buku') }}">
+        @csrf
+        <input type="hidden" name="_method" id="metode" value="PUT" disabled>
         <div>
             <label for="kategori_id">Kategori</label>
-            <select id="kategori_id" required>
+            <select id="kategori_id" name="kategori_id" required>
                 <option value="">-- Pilih kategori --</option>
                 @foreach ($kategoris as $k)
-                <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                <option value="{{ $k->id }}" @selected(old('kategori_id')==$k->id)>{{ $k->nama }}</option>
                 @endforeach
             </select>
         </div>
         <div>
             <label for="judul">Judul</label>
-            <input type="text" id="judul">
+            <input type="text" id="judul" name="judul" value="{{ old('judul') }}" required>
         </div>
         <div>
             <label for="penulis">Penulis</label>
-            <input type="text" id="penulis">
+            <input type="text" id="penulis" name="penulis" value="{{ old('penulis') }}" required>
         </div>
         <div>
             <label for="tahun_terbit">Tahun Terbit</label>
-            <input type="text" id="tahun_terbit">
+            <input type="text" id="tahun_terbit" name="tahun_terbit" value="{{ old('tahun_terbit') }}" required>
         </div>
         <div class="buku-aksi">
             <button type="submit" id="btn-simpan">Tambah Buku</button>
@@ -187,7 +194,7 @@
                 <td>
                     <a href="{{ url('/buku/' . $buku->id) }}" class="btn-kecil">Detail</a>
 
-                    @can('kelola data buku')
+                    @can('kelola-buku')
                     <button type="button"
                         class="btn-kecil sekunder btn-ubah"
                         data-id="{{ $buku->id }}"
@@ -218,123 +225,43 @@
 </div>
 
 <script>
-    const API = '/api/buku';
-    const wrap = document.querySelector('.buku-wrap');
-    const BISA_KELOLA = wrap.dataset.kelola === '1';
-    const HEADER_JSON = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': wrap.dataset.csrf
-    };
-
-    const kotakPesan = document.getElementById('pesan');
-
-    // Elemen formulir hanya ada untuk yang berhak mengelola buku
     const form = document.getElementById('form-buku');
-    const btnSimpan = document.getElementById('btn-simpan');
-    const btnBatal = document.getElementById('btn-batal');
-    const fKategori = document.getElementById('kategori_id');
-    const fJudul = document.getElementById('judul');
-    const fPenulis = document.getElementById('penulis');
-    const fTahun = document.getElementById('tahun_terbit');
 
-    let editId = null;
-
-    function tampilPesan(teks, jenis) {
-        kotakPesan.textContent = teks;
-        kotakPesan.className = jenis;
-    }
-
-    function bersihkanPesan() {
-        kotakPesan.textContent = '';
-        kotakPesan.className = '';
-    }
-
-    function tampilError(err) {
-        if (err instanceof TypeError) {
-            tampilPesan('API tidak dapat diakses. Pastikan server berjalan.', 'gagal');
-            return;
-        }
-        if (err.errors) {
-            const semua = Object.values(err.errors).flat().join(' ');
-            tampilPesan(semua, 'gagal');
-            return;
-        }
-        tampilPesan(err.message, 'gagal');
-    }
-
-    async function kirim(url, method, body) {
-        const res = await fetch(url, {
-            method: method,
-            headers: HEADER_JSON,
-            body: body ? JSON.stringify(body) : undefined,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            const err = new Error(data.message || 'Permintaan gagal (status ' + res.status + ').');
-            err.errors = data.errors || null;
-            throw err;
-        }
-        return data;
-    }
-
-    function resetForm() {
-        form.reset();
-        editId = null;
-        btnSimpan.textContent = 'Tambah Buku';
-        btnBatal.style.display = 'none';
-    }
-
-    function mulaiUbah(tombol) {
-        bersihkanPesan();
-        editId = tombol.dataset.id;
-        fKategori.value = tombol.dataset.kategori_id;
-        fJudul.value = tombol.dataset.judul;
-        fPenulis.value = tombol.dataset.penulis;
-        fTahun.value = tombol.dataset.tahun_terbit;
-        btnSimpan.textContent = 'Simpan Perubahan';
-        btnBatal.style.display = 'inline-block';
-        form.scrollIntoView({
-            behavior: 'smooth'
-        });
-    }
-
-    // Tombol Ubah dipasang lewat delegasi, karena baris tabel dirender Blade
-    document.querySelectorAll('.btn-ubah').forEach((tombol) => {
-        tombol.addEventListener('click', () => mulaiUbah(tombol));
-    });
-
-    // Listener formulir Tambah/Ubah dipasang hanya jika formulirnya ada
+    // Form hanya ada untuk admin/petugas
     if (form) {
-        btnBatal.addEventListener('click', () => {
-            bersihkanPesan();
-            resetForm();
+        const URL_DASAR = form.dataset.urlDasar;
+        const URL_TAMBAH = form.getAttribute('action');
+        const metode = document.getElementById('metode');
+        const btnSimpan = document.getElementById('btn-simpan');
+        const btnBatal = document.getElementById('btn-batal');
+
+        function resetForm() {
+            form.reset();
+            form.setAttribute('action', URL_TAMBAH);
+            metode.disabled = true;
+            btnSimpan.textContent = 'Tambah Buku';
+            btnBatal.style.display = 'none';
+        }
+
+        function mulaiUbah(tombol) {
+            document.getElementById('kategori_id').value = tombol.dataset.kategori_id;
+            document.getElementById('judul').value = tombol.dataset.judul;
+            document.getElementById('penulis').value = tombol.dataset.penulis;
+            document.getElementById('tahun_terbit').value = tombol.dataset.tahun_terbit;
+            form.setAttribute('action', URL_DASAR + '/' + tombol.dataset.id);
+            metode.disabled = false;
+            btnSimpan.textContent = 'Simpan Perubahan';
+            btnBatal.style.display = 'inline-block';
+            form.scrollIntoView({
+                behavior: 'smooth'
+            });
+        }
+
+        document.querySelectorAll('.btn-ubah').forEach((tombol) => {
+            tombol.addEventListener('click', () => mulaiUbah(tombol));
         });
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            bersihkanPesan();
-
-            const payload = {
-                kategori_id: fKategori.value,
-                judul: fJudul.value,
-                penulis: fPenulis.value,
-                tahun_terbit: fTahun.value,
-            };
-
-            try {
-                if (editId) {
-                    await kirim(API + '/' + editId, 'PUT', payload);
-                } else {
-                    await kirim(API, 'POST', payload);
-                }
-                // Tabel kini dirender server-side, jadi halaman dimuat ulang
-                // agar data terbaru tampil.
-                window.location.reload();
-            } catch (err) {
-                tampilError(err);
-            }
-        });
+        btnBatal.addEventListener('click', resetForm);
     }
 </script>
 @endsection
