@@ -122,7 +122,11 @@
     <h1>Daftar Buku</h1>
 
     <div id="pesan"></div>
-
+    @if (session('error'))
+    <div style="background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:6px;margin-bottom:12px;">
+        {{ session('error') }}
+    </div>
+    @endif
     @if (session('sukses'))
     <div class="sukses" style="padding:10px 12px;border-radius:6px;margin-bottom:12px;background:#dcfce7;color:#166534;">
         {{ session('sukses') }}

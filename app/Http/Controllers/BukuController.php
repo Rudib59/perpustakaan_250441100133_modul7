@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Buku;
 use App\Models\Kategori;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +24,7 @@ class BukuController extends Controller
 
         return view('buku.show', compact('buku'));
     }
+
     public function create()
     {
         $kategoris = Kategori::orderBy('nama')->get();
@@ -64,7 +66,8 @@ class BukuController extends Controller
 
         return redirect()->route('buku.index')->with('sukses', 'Buku berhasil diperbarui.');
     }
-    // RENTAN (A2): nilai judul digabung langsung ke string SQL
+
+    // Aman (A2): nilai judul dikirim lewat binding, bukan digabung ke string SQL
     public function cari(Request $request)
     {
         $judul = $request->query('judul');
@@ -74,11 +77,20 @@ class BukuController extends Controller
         return response()->json($hasil);
     }
 
-    // Dipakai route A3 (GET) dan, setelah Soal 2, route DELETE
     public function destroy(Buku $buku)
     {
-        $buku->delete();
+        try {
+            $buku->delete();
+        } catch (QueryException $e) {
+            // 23000 = MySQL, 23503 = PostgreSQL (pelanggaran foreign key)
+            if (in_array((string) $e->getCode(), ['23000', '23503'], true)) {
+                return redirect()->route('buku.index')
+                    ->with('error', 'Buku ini tidak bisa dihapus karena sedang dipinjam');
+            }
 
-        return redirect()->route('buku.index');
+            throw $e;
+        }
+
+        return redirect()->route('buku.index')->with('sukses', 'Buku berhasil dihapus.');
     }
 }
