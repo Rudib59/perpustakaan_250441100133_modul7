@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+node_modules
+tests
+storage/logs
+README.md
+phpunit.xml
+postman
+.postman
